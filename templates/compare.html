@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Waypoint — Pick Your Preference{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+  @media (max-width: 560px) { .compare-grid { grid-template-columns: 1fr; } }
+
+  .city-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .city-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .city-card h3 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+  .city-card .meta { font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+  }
+  .stat-row span:first-child { color: var(--muted); }
+  .stat-row span:last-child { color: var(--accent); font-weight: 600; }
+
+  .vs-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--muted);
+  }
+
+  .round-info {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Which city appeals more?</h1>
+<p class="subtitle">Pick the destination that feels more like your kind of trip. Round {{ round }} of 5.</p>
+<div class="round-info">Session: <code>{{ session_id[:8] }}…</code></div>
+
+<form method="post" action="/compare">
+  <input type="hidden" name="session_id" value="{{ session_id }}" />
+  <input type="hidden" name="city_a_id" value="{{ city_a.id }}" />
+  <input type="hidden" name="city_b_id" value="{{ city_b.id }}" />
+
+  <div class="compare-grid">
+    {% for city, field_name in [(city_a, "city_a"), (city_b, "city_b")] %}
+    <button type="submit" name="preferred_city_id" value="{{ city.id }}" class="city-card" style="text-align:left;background:var(--surface)">
+      <h3>{{ city.name }}</h3>
+      <div class="meta">{{ city.country }} · {{ city.region }}</div>
+      <div class="stat-row"><span>Cost</span>        <span>{{ "%.0f"|format(city.cost_index * 100) }}%</span></div>
+      <div class="stat-row"><span>Safety</span>      <span>{{ "%.0f"|format(city.safety_index * 100) }}%</span></div>
+      <div class="stat-row"><span>Warmth</span>      <span>{{ "%.0f"|format(city.warmth_index * 100) }}%</span></div>
+      <div class="stat-row"><span>Outdoors</span>    <span>{{ "%.0f"|format(city.outdoor_score * 100) }}%</span></div>
+      <div class="stat-row"><span>Food</span>        <span>{{ "%.0f"|format(city.food_score * 100) }}%</span></div>
+      <div class="stat-row"><span>Nightlife</span>   <span>{{ "%.0f"|format(city.nightlife_score * 100) }}%</span></div>
+      <div class="stat-row"><span>Walkability</span> <span>{{ "%.0f"|format(city.walkability * 100) }}%</span></div>
+      <div class="stat-row"><span>English</span>     <span>{{ "%.0f"|format(city.english_friendly * 100) }}%</span></div>
+    </button>
+    {% endfor %}
+  </div>
+</form>
+{% endblock %}

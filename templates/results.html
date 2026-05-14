@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Waypoint — Your Matches{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .results-list { display: flex; flex-direction: column; gap: 1rem; }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem 1.5rem;
+    align-items: start;
+  }
+  .result-card:first-child { border-color: var(--accent); }
+
+  .city-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+  .city-meta {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+
+  .score-badge {
+    text-align: right;
+  }
+  .score-number {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .score-label { font-size: 0.72rem; color: var(--muted); }
+
+  .bars {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem 1.2rem;
+    margin-top: 0.75rem;
+  }
+
+  .bar-item label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 3px;
+    text-transform: capitalize;
+  }
+  .bar-track {
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 5px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .rank-chip {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--surface2);
+    color: var(--muted);
+    margin-right: 0.5rem;
+  }
+  .result-card:first-child .rank-chip {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .back-row { margin-bottom: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Your Top Matches</h1>
+<p class="subtitle">Ranked by cosine similarity to your preferences, with a penalty for over-touristed destinations.</p>
+
+<div class="back-row">
+  <a href="/" class="btn btn-secondary">← Adjust Preferences</a>
+</div>
+
+<div class="results-list">
+  {% for city in results %}
+  <div class="result-card">
+    <div>
+      <div class="city-name">
+        <span class="rank-chip">#{{ loop.index }}</span>
+        {{ city.name }}
+      </div>
+      <div class="city-meta">{{ city.country }} · {{ city.region }}</div>
+    </div>
+
+    <div class="score-badge">
+      <div class="score-number">{{ "%.2f"|format(city.similarity) }}</div>
+      <div class="score-label">match score</div>
+    </div>
+
+    <div class="bars">
+      {% set fields = [
+        ("cost_index", city.cost_index),
+        ("safety_index", city.safety_index),
+        ("tourism_volume", city.tourism_volume),
+        ("warmth_index", city.warmth_index),
+        ("outdoor_score", city.outdoor_score),
+        ("food_score", city.food_score),
+        ("nightlife_score", city.nightlife_score),
+        ("walkability", city.walkability),
+        ("english_friendly", city.english_friendly),
+      ] %}
+      {% for fname, fval in fields %}
+      <div class="bar-item">
+        <label>{{ fname.replace("_", " ") }}</label>
+        <div class="bar-track">
+          <div class="bar-fill" style="width: {{ (fval * 100)|int }}%"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
