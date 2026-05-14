@@ -1,13 +1,18 @@
 import uuid
+from typing import Annotated, List
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+import numpy as np
 
 from app.database import engine, get_db
 from app.models import Base, City, UserComparison
-from app.schemas import PreferenceVector, ComparisonCreate, CityOut
-from app.recommender import recommend, infer_preferences_from_comparisons, FEATURE_FIELDS
+from app.schemas import PreferenceVector, CityOut
+from app.recommender import (
+    recommend, infer_preferences_from_comparisons,
+    explain_match, city_to_vector, FEATURE_FIELDS,
+)
 
 Base.metadata.create_all(bind=engine)
 
@@ -16,49 +21,48 @@ templates = Jinja2Templates(directory="templates")
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
-    cities = db.query(City).order_by(City.name).all()
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "fields": FEATURE_FIELDS, "cities": cities},
-    )
+def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post("/recommend", response_class=HTMLResponse)
 def get_recommendations(
     request: Request,
-    cost_index: float = Form(0.5),
-    safety_index: float = Form(0.5),
-    tourism_volume: float = Form(0.5),
-    warmth_index: float = Form(0.5),
-    outdoor_score: float = Form(0.5),
-    food_score: float = Form(0.5),
-    nightlife_score: float = Form(0.5),
-    walkability: float = Form(0.5),
-    english_friendly: float = Form(0.5),
+    city_ids: Annotated[List[int], Form()] = [],
     db: Session = Depends(get_db),
 ):
-    prefs = PreferenceVector(
-        cost_index=cost_index,
-        safety_index=safety_index,
-        tourism_volume=tourism_volume,
-        warmth_index=warmth_index,
-        outdoor_score=outdoor_score,
-        food_score=food_score,
-        nightlife_score=nightlife_score,
-        walkability=walkability,
-        english_friendly=english_friendly,
-    )
-    results = recommend(prefs, db, top_n=5)
-    cities_out = []
-    for city, score in results:
+    if not city_ids:
+        raise HTTPException(status_code=400, detail="Select at least one city you've loved.")
+
+    source_cities = db.query(City).filter(City.id.in_(city_ids)).all()
+    if not source_cities:
+        raise HTTPException(status_code=400, detail="None of the provided city IDs were found.")
+
+    vectors = np.array([city_to_vector(c) for c in source_cities])
+    mean_vec = vectors.mean(axis=0)
+    prefs = PreferenceVector(**{f: float(mean_vec[i]) for i, f in enumerate(FEATURE_FIELDS)})
+    pref_vec = mean_vec
+
+    raw_results = recommend(prefs, db, top_n=5, exclude_ids=city_ids)
+
+    results = []
+    for city, score in raw_results:
         c = CityOut.model_validate(city)
         c.similarity = score
-        cities_out.append(c)
+        results.append({
+            "city": c,
+            "score": score,
+            "reasons": explain_match(pref_vec, city),
+            "underrated": round((1 - city.tourism_volume) * 100),
+        })
 
     return templates.TemplateResponse(
         "results.html",
-        {"request": request, "results": cities_out, "prefs": prefs},
+        {
+            "request": request,
+            "results": results,
+            "source_cities": [c.name for c in source_cities],
+        },
     )
 
 

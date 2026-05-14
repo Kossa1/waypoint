@@ -4,25 +4,50 @@
 
 {% block extra_styles %}
 <style>
-  .results-list { display: flex; flex-direction: column; gap: 1rem; }
+  .because {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+  .because strong { color: var(--text); }
+
+  .results-list { display: flex; flex-direction: column; gap: 1.25rem; }
 
   .result-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.5rem 1.5rem;
-    align-items: start;
+    padding: 1.4rem 1.5rem;
   }
   .result-card:first-child { border-color: var(--accent); }
 
-  .city-name {
-    font-size: 1.2rem;
-    font-weight: 700;
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
   }
-  .city-meta {
+
+  .city-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .rank-chip {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--surface2);
+    color: var(--muted);
+  }
+  .result-card:first-child .rank-chip {
+    background: var(--accent);
+    color: #fff;
+  }
+  .city-location {
     font-size: 0.82rem;
     color: var(--muted);
     margin-top: 0.15rem;
@@ -30,54 +55,79 @@
 
   .score-badge {
     text-align: right;
+    flex-shrink: 0;
   }
   .score-number {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: var(--accent);
     line-height: 1;
   }
-  .score-label { font-size: 0.72rem; color: var(--muted); }
+  .score-label { font-size: 0.7rem; color: var(--muted); }
 
-  .bars {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem 1.2rem;
-    margin-top: 0.75rem;
+  .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
   }
 
-  .bar-item label {
-    font-size: 0.72rem;
+  /* Reason chips */
+  .reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .reasons-label {
+    font-size: 0.75rem;
     color: var(--muted);
-    display: block;
-    margin-bottom: 3px;
-    text-transform: capitalize;
+    margin-right: 0.25rem;
   }
-  .bar-track {
+  .reason-chip {
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent2) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent2) 35%, transparent);
+    color: var(--accent2);
+  }
+  .no-reasons { font-size: 0.78rem; color: var(--muted); font-style: italic; }
+
+  /* Underrated row */
+  .underrated-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .underrated-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .underrated-label.gem   { color: var(--success); }
+  .underrated-label.radar { color: #f59e0b; }
+  .underrated-label.known { color: var(--muted); }
+
+  .underrated-track {
+    flex: 1;
+    height: 4px;
     background: var(--surface2);
     border-radius: 4px;
-    height: 5px;
     overflow: hidden;
   }
-  .bar-fill {
+  .underrated-fill {
     height: 100%;
     border-radius: 4px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
   }
+  .underrated-fill.gem   { background: var(--success); }
+  .underrated-fill.radar { background: #f59e0b; }
+  .underrated-fill.known { background: var(--muted); }
 
-  .rank-chip {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--surface2);
+  .underrated-pct {
+    font-size: 0.75rem;
     color: var(--muted);
-    margin-right: 0.5rem;
-  }
-  .result-card:first-child .rank-chip {
-    background: var(--accent);
-    color: #fff;
+    white-space: nowrap;
   }
 
   .back-row { margin-bottom: 1.5rem; }
@@ -86,48 +136,65 @@
 
 {% block content %}
 <h1>Your Top Matches</h1>
-<p class="subtitle">Ranked by cosine similarity to your preferences, with a penalty for over-touristed destinations.</p>
+
+<p class="because">
+  Because you loved
+  <strong>{{ source_cities | join(", ") }}</strong>
+</p>
 
 <div class="back-row">
-  <a href="/" class="btn btn-secondary">← Adjust Preferences</a>
+  <a href="/" class="btn btn-secondary">← Try different cities</a>
 </div>
 
 <div class="results-list">
-  {% for city in results %}
+  {% for r in results %}
+  {% set city = r.city %}
+  {% set underrated = r.underrated %}
+  {% if underrated >= 70 %}
+    {% set u_class = "gem" %}
+    {% set u_label = "Hidden gem" %}
+  {% elif underrated >= 40 %}
+    {% set u_class = "radar" %}
+    {% set u_label = "Under the radar" %}
+  {% else %}
+    {% set u_class = "known" %}
+    {% set u_label = "Well known" %}
+  {% endif %}
+
   <div class="result-card">
-    <div>
-      <div class="city-name">
-        <span class="rank-chip">#{{ loop.index }}</span>
-        {{ city.name }}
-      </div>
-      <div class="city-meta">{{ city.country }} · {{ city.region }}</div>
-    </div>
-
-    <div class="score-badge">
-      <div class="score-number">{{ "%.2f"|format(city.similarity) }}</div>
-      <div class="score-label">match score</div>
-    </div>
-
-    <div class="bars">
-      {% set fields = [
-        ("cost_index", city.cost_index),
-        ("safety_index", city.safety_index),
-        ("tourism_volume", city.tourism_volume),
-        ("warmth_index", city.warmth_index),
-        ("outdoor_score", city.outdoor_score),
-        ("food_score", city.food_score),
-        ("nightlife_score", city.nightlife_score),
-        ("walkability", city.walkability),
-        ("english_friendly", city.english_friendly),
-      ] %}
-      {% for fname, fval in fields %}
-      <div class="bar-item">
-        <label>{{ fname.replace("_", " ") }}</label>
-        <div class="bar-track">
-          <div class="bar-fill" style="width: {{ (fval * 100)|int }}%"></div>
+    <div class="card-header">
+      <div>
+        <div class="city-name">
+          <span class="rank-chip">#{{ loop.index }}</span>
+          {{ city.name }}
         </div>
+        <div class="city-location">{{ city.country }} · {{ city.region }}</div>
       </div>
-      {% endfor %}
+      <div class="score-badge">
+        <div class="score-number">{{ "%.2f"|format(r.score) }}</div>
+        <div class="score-label">match score</div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div class="reasons">
+        <span class="reasons-label">Great for:</span>
+        {% if r.reasons %}
+          {% for reason in r.reasons %}
+          <span class="reason-chip">{{ reason }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="no-reasons">Similar overall vibe</span>
+        {% endif %}
+      </div>
+
+      <div class="underrated-row">
+        <span class="underrated-label {{ u_class }}">{{ u_label }}</span>
+        <div class="underrated-track">
+          <div class="underrated-fill {{ u_class }}" style="width: {{ underrated }}%"></div>
+        </div>
+        <span class="underrated-pct">{{ underrated }}% off the beaten path</span>
+      </div>
     </div>
   </div>
   {% endfor %}

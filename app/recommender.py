@@ -15,6 +15,17 @@ FEATURE_FIELDS = [
     "english_friendly",
 ]
 
+FIELD_LABELS: dict[str, str] = {
+    "cost_index":       "affordable",
+    "safety_index":     "safe",
+    "warmth_index":     "warm climate",
+    "outdoor_score":    "great outdoors",
+    "food_score":       "great food",
+    "nightlife_score":  "nightlife",
+    "walkability":      "walkable",
+    "english_friendly": "English-friendly",
+}
+
 # High tourism volume dilutes the recommendation score — popular ≠ best fit.
 TOURISM_PENALTY_WEIGHT = 0.15
 
@@ -52,6 +63,21 @@ def recommend(
 
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:top_n]
+
+
+def explain_match(pref_vec: np.ndarray, city: City, top_n: int = 3) -> list[str]:
+    city_vec = city_to_vector(city)
+    scores = np.minimum(pref_vec, city_vec)
+    scores[FEATURE_FIELDS.index("tourism_volume")] = 0
+    top_indices = np.argsort(scores)[::-1]
+    labels = []
+    for i in top_indices:
+        field = FEATURE_FIELDS[i]
+        if field in FIELD_LABELS and scores[i] >= 0.55:
+            labels.append(FIELD_LABELS[field])
+        if len(labels) == top_n:
+            break
+    return labels
 
 
 def infer_preferences_from_comparisons(session_id: str, db: Session) -> PreferenceVector:

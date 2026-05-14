@@ -1,104 +1,241 @@
 {% extends "base.html" %}
 
-{% block title %}Waypoint — Find Your City{% endblock %}
+{% block title %}Waypoint — Find Your Next City{% endblock %}
 
 {% block extra_styles %}
 <style>
-  .sliders-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.4rem 2.5rem;
-    margin-bottom: 2rem;
+  .search-wrap {
+    position: relative;
+    margin-bottom: 1rem;
   }
-  @media (max-width: 600px) { .sliders-grid { grid-template-columns: 1fr; } }
 
-  .slider-group label {
+  #city-search {
+    width: 100%;
+    padding: 0.85rem 1.1rem;
+    font-size: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #city-search:focus { border-color: var(--accent); }
+  #city-search::placeholder { color: var(--muted); }
+
+  #suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 100;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 0.7rem 1.1rem;
+    cursor: pointer;
     display: flex;
     justify-content: space-between;
-    font-size: 0.85rem;
-    margin-bottom: 0.4rem;
-    color: var(--muted);
-  }
-  .slider-group label span { color: var(--accent); font-weight: 600; }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 4px;
-    background: var(--border);
-    outline: none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    transition: transform 0.1s;
-  }
-  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-
-  .field-label {
-    text-transform: capitalize;
+    align-items: center;
     font-size: 0.92rem;
-    font-weight: 500;
-    color: var(--text);
-    margin-bottom: 0.25rem;
+    transition: background 0.1s;
   }
-  .field-label::after { content: ""; }
-
-  .hint {
-    font-size: 0.75rem;
+  .suggestion-item:hover, .suggestion-item.active {
+    background: var(--border);
+  }
+  .suggestion-item .country {
+    font-size: 0.78rem;
     color: var(--muted);
-    margin-top: 0.2rem;
   }
 
-  .actions { display: flex; gap: 1rem; align-items: center; }
+  #chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  .chip button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.1s;
+  }
+  .chip button:hover { opacity: 1; }
+
+  #submit-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .empty-hint {
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-style: italic;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<h1>Find Your Next City</h1>
-<p class="subtitle">Drag the sliders to match your travel style. We'll rank destinations by how well they fit.</p>
+<h1>Where do you want to go next?</h1>
+<p class="subtitle">Add cities you've loved — we'll find where to go next.</p>
 
-<form method="post" action="/recommend">
-  <div class="card">
-    <div class="sliders-grid">
-
-      {% set meta = {
-        "cost_index":      ("Budget",        "0 = very affordable · 1 = luxury"),
-        "safety_index":    ("Safety",         "0 = risky · 1 = very safe"),
-        "tourism_volume":  ("Crowd level",    "0 = hidden gem · 1 = major tourist hub"),
-        "warmth_index":    ("Climate warmth", "0 = cold · 1 = tropical"),
-        "outdoor_score":   ("Outdoors",       "hiking, beaches, parks"),
-        "food_score":      ("Food scene",     "local cuisine & dining variety"),
-        "nightlife_score": ("Nightlife",      "bars, clubs, late-night culture"),
-        "walkability":     ("Walkability",    "how much you can explore on foot"),
-        "english_friendly":("English",        "ease of communication"),
-      } %}
-
-      {% for field in fields %}
-      {% set label, hint = meta[field] %}
-      <div class="slider-group">
-        <div class="field-label">{{ label }}</div>
-        <label>
-          <span id="val-{{ field }}">0.50</span>
-        </label>
-        <input
-          type="range" min="0" max="1" step="0.05" value="0.5"
-          name="{{ field }}" id="{{ field }}"
-          oninput="document.getElementById('val-{{ field }}').textContent = parseFloat(this.value).toFixed(2)"
-        />
-        <div class="hint">{{ hint }}</div>
-      </div>
-      {% endfor %}
-
-    </div>
-    <div class="actions">
-      <button type="submit" class="btn btn-primary">Get Recommendations →</button>
-      <a href="/compare/start" class="btn btn-secondary">Or: Compare Cities</a>
-    </div>
+<div class="card">
+  <div class="search-wrap">
+    <input
+      id="city-search"
+      type="text"
+      placeholder="Search a city you've visited and loved…"
+      autocomplete="off"
+    />
+    <div id="suggestions"></div>
   </div>
-</form>
+
+  <div id="chips">
+    <span class="empty-hint" id="empty-hint">No cities added yet</span>
+  </div>
+
+  <form id="recommend-form" method="post" action="/recommend">
+    <div id="hidden-inputs"></div>
+    <button type="submit" id="submit-btn" class="btn btn-primary" disabled>
+      Find destinations →
+    </button>
+  </form>
+</div>
+
+<script>
+  let allCities = [];
+  const added = new Map(); // id → name
+  let activeIdx = -1;
+
+  async function loadCities() {
+    const res = await fetch('/api/cities');
+    allCities = await res.json();
+  }
+
+  const input = document.getElementById('city-search');
+  const dropdown = document.getElementById('suggestions');
+  const chipsEl = document.getElementById('chips');
+  const hiddenEl = document.getElementById('hidden-inputs');
+  const submitBtn = document.getElementById('submit-btn');
+  const emptyHint = document.getElementById('empty-hint');
+
+  function renderSuggestions(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) { dropdown.style.display = 'none'; return; }
+
+    const matches = allCities
+      .filter(c => c.name.toLowerCase().includes(q) && !added.has(c.id))
+      .slice(0, 6);
+
+    if (!matches.length) { dropdown.style.display = 'none'; return; }
+
+    dropdown.innerHTML = matches.map((c, i) =>
+      `<div class="suggestion-item" data-id="${c.id}" data-name="${c.name}" data-idx="${i}">
+        <span>${c.name}</span>
+        <span class="country">${c.country}</span>
+      </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+    activeIdx = -1;
+
+    dropdown.querySelectorAll('.suggestion-item').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        addCity(parseInt(el.dataset.id), el.dataset.name);
+      });
+    });
+  }
+
+  function addCity(id, name) {
+    if (added.has(id)) return;
+    added.set(id, name);
+
+    // chip
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.dataset.id = id;
+    chip.innerHTML = `${name} <button type="button" aria-label="Remove ${name}">×</button>`;
+    chip.querySelector('button').addEventListener('click', () => removeCity(id));
+    chipsEl.appendChild(chip);
+
+    // hidden input
+    const inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = 'city_ids';
+    inp.value = id;
+    inp.id = `hidden-${id}`;
+    hiddenEl.appendChild(inp);
+
+    input.value = '';
+    dropdown.style.display = 'none';
+    updateState();
+  }
+
+  function removeCity(id) {
+    added.delete(id);
+    chipsEl.querySelector(`.chip[data-id="${id}"]`)?.remove();
+    hiddenEl.querySelector(`#hidden-${id}`)?.remove();
+    updateState();
+  }
+
+  function updateState() {
+    const hasAny = added.size > 0;
+    submitBtn.disabled = !hasAny;
+    emptyHint.style.display = hasAny ? 'none' : 'inline';
+  }
+
+  input.addEventListener('input', () => renderSuggestions(input.value));
+
+  input.addEventListener('keydown', e => {
+    const items = dropdown.querySelectorAll('.suggestion-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIdx = Math.min(activeIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx - 1, 0);
+    } else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault();
+      const el = items[activeIdx];
+      addCity(parseInt(el.dataset.id), el.dataset.name);
+      return;
+    } else if (e.key === 'Escape') {
+      dropdown.style.display = 'none';
+      return;
+    }
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) dropdown.style.display = 'none';
+  });
+
+  loadCities();
+</script>
 {% endblock %}
